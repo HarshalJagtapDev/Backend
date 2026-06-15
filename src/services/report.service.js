@@ -1,0 +1,583 @@
+const path = require("path");
+
+const { buildKey, normalizePath } = require("../utils/normalize.util");
+
+const { readExcel, writeAOASheet, applyStyles } = require("./excel.service");
+
+const { getAllUserPathActivities } = require("./udemy.service");
+
+const { extractLearningPaths } = require("../utils/learningPath.util");
+
+// const XLSX = require("xlsx");
+const XLSX = require("xlsx-js-style");
+async function generateReport(inputFilePath) {
+    console.log("STEP 1 - Reading file");
+
+    const employees = readExcel(inputFilePath).map((row) => {
+        const normalized = {};
+
+        Object.keys(row).forEach((key) => {
+            normalized[key.trim()] = row[key];
+        });
+
+        return normalized;
+    });
+
+    console.log("STEP 2 - Employees loaded:", employees.length);
+
+    if (!employees.length) {
+        throw new Error("Input file is empty");
+    }
+
+    const udemyRecords = await getAllUserPathActivities();
+
+    console.log("STEP 4 - Udemy records received:", udemyRecords.length);
+
+    const lookup = new Map();
+
+    console.log("STEP 5 - Building lookup");
+
+    for (const record of udemyRecords) {
+        if (
+            record.user_email === "diptim@harbingergroup.com" &&
+            record.path_title === "AURA Foundation 2.0 - GenAI Evaluation & Quality Measurement"
+        ) {
+            console.log(
+                "API COMPLETION RATIO:",
+                record.completion_ratio
+            );
+        }
+        const key = buildKey(record.user_email, record.path_title);
+        lookup.set(key, record.completion_ratio || 0);
+    }
+
+    const sections = [];
+    let currentSection = [];
+
+    console.log("STEP 6 - Creating report rows");
+
+    for (const row of employees) {
+        if (row["Employee ID"] === "Employee ID" || row["Email"] === "Email") {
+            if (currentSection.length) sections.push(currentSection);
+            currentSection = [];
+            continue;
+        }
+        currentSection.push(row);
+    }
+
+    if (currentSection.length) sections.push(currentSection);
+
+    const allUsersSheetData = [];
+
+    for (const section of sections) {
+        const sampleLP = section[0]["LP given"];
+        const learningPaths = extractLearningPaths(sampleLP);
+        const isMultiLP = learningPaths.length > 1;
+        if (isMultiLP) {
+            const headers = [
+                "Harbinger Business Unit",
+                "Employee ID",
+                "Employee Name",
+                "Designation Group",
+                "Designation",
+                "Email",
+                "LP given",
+                "Date of Initiation",
+                "Target Due Date",
+                "Groups",
+                "Remarks",
+                "Average of Learning Path Progress",
+                ...learningPaths,
+            ];
+
+            allUsersSheetData.push(headers);
+
+            for (const emp of section) {
+
+                const employeeLP = (emp["LP given"] || "")
+                    .toString()
+                    .trim()
+                    .toUpperCase();
+
+                // Employee has NO Learning Program assigned
+                if (
+                    !employeeLP ||
+                    employeeLP === "NA" ||
+                    employeeLP === "N/A"
+                ) {
+                    allUsersSheetData.push([
+                        emp["Harbinger Business Unit"],
+                        emp["Employee ID"],
+                        emp["Employee Name"],
+                        emp["Designation Group"],
+                        emp["Designation"],
+                        emp["Email"],
+                        emp["LP given"],
+                        emp["Date of Initiation"],
+                        emp["Target Due Date"],
+                        emp["Groups"],
+                        emp["Remarks"],
+                        "NA",
+                        ...learningPaths.map(() => "NA"),
+                    ]);
+
+                    continue;
+                }
+
+                let total = 0;
+                const progresses = [];
+
+                for (const lp of learningPaths) {
+                    const key = buildKey(emp.Email, lp);
+
+                    const progress = Number(
+                        lookup.get(key) || 0
+                    );
+
+                    total += progress;
+                    progresses.push(progress);
+                }
+
+                const average =
+                    progresses.length
+                        ? Number(
+                            (
+                                total /
+                                progresses.length
+                            ).toFixed(2)
+                        )
+                        : "NA";
+
+                allUsersSheetData.push([
+                    emp["Harbinger Business Unit"],
+                    emp["Employee ID"],
+                    emp["Employee Name"],
+                    emp["Designation Group"],
+                    emp["Designation"],
+                    emp["Email"],
+                    emp["LP given"],
+                    emp["Date of Initiation"],
+                    emp["Target Due Date"],
+                    emp["Groups"],
+                    emp["Remarks"],
+                    average,
+                    ...progresses,
+                ]);
+            }
+
+            allUsersSheetData.push([]);
+            continue;
+        }
+        // SINGLE Learning Program
+        const headers = [
+            "Harbinger Business Unit",
+            "Employee ID",
+            "Employee Name",
+            "Designation Group",
+            "Designation",
+            "Email",
+            "LP given",
+            "Date of Initiation",
+            "Target Due Date",
+            "Groups",
+            "Remarks",
+            "Current Progress",
+        ];
+
+        allUsersSheetData.push(headers);
+
+        for (const emp of section) {
+            const learningPath = (emp["LP given"] || "").toString().trim();
+
+            let progress;
+
+            if (!learningPath || learningPath.toUpperCase() === "NA") {
+                progress = "NA";
+            } else {
+                const key = buildKey(
+                    emp.Email,
+                    learningPath
+                );
+
+                if (!lookup.has(key)) {
+                    const matchingEmailRecords = udemyRecords.filter(
+                        (r) =>
+                            r.user_email &&
+                            r.user_email.trim().toLowerCase() ===
+                            emp.Email.trim().toLowerCase()
+                    );
+
+                    console.log("================================");
+                    console.log("NOT FOUND");
+
+                    console.log("Employee Email:");
+                    console.log(JSON.stringify(emp.Email));
+
+                    console.log("Employee LP:");
+                    console.log(JSON.stringify(learningPath));
+
+                    console.log("Generated Key:");
+                    console.log(key);
+
+                    console.log(
+                        "Records found for this email:",
+                        matchingEmailRecords.length
+                    );
+
+                    matchingEmailRecords.forEach((r) => {
+                        console.log("-------------------");
+
+                        console.log(
+                            "Udemy Email:",
+                            JSON.stringify(r.user_email)
+                        );
+
+                        console.log(
+                            "Udemy LP:",
+                            JSON.stringify(r.path_title)
+                        );
+
+                        console.log(
+                            "LP Equal?",
+                            learningPath === r.path_title
+                        );
+
+                        console.log(
+                            "Normalized LP Equal?",
+                            normalizePath(learningPath) ===
+                            normalizePath(r.path_title)
+                        );
+
+                        console.log(
+                            "Lookup Key from Udemy:",
+                            buildKey(
+                                r.user_email,
+                                r.path_title
+                            )
+                        );
+                    });
+
+                    console.log("================================");
+
+                    progress = "Not Found";
+                } else {
+                    progress = lookup.get(key);
+                }
+            }
+
+            allUsersSheetData.push([
+                emp["Harbinger Business Unit"],
+                emp["Employee ID"],
+                emp["Employee Name"],
+                emp["Designation Group"],
+                emp["Designation"],
+                emp["Email"],
+                emp["LP given"],
+                emp["Date of Initiation"],
+                emp["Target Due Date"],
+                emp["Groups"],
+                emp["Remarks"],
+                progress,
+            ]);
+        }
+
+        allUsersSheetData.push([]);
+    }
+
+    // ======================================================
+    // CLEAN DATA FOR SUMMARY
+    // ======================================================
+
+    const flatRows = allUsersSheetData.filter(
+        (row) => Array.isArray(row) && row.length > 0 && row[0] !== "Harbinger Business Unit"
+    );
+
+    const headerRow = allUsersSheetData.find(
+        (row) =>
+            Array.isArray(row) &&
+            row.includes("Harbinger Business Unit")
+    );
+
+    const columnMap = {};
+
+    headerRow.forEach((header, index) => {
+        columnMap[header] = index;
+    });
+
+    const GROUP_IDX = columnMap["Groups"];
+    const LP_IDX = columnMap["LP given"];
+    const PROGRESS_IDX =
+        columnMap["Current Progress"] ??
+        columnMap["Average of Learning Path Progress"];
+
+    const BU_IDX = columnMap["Harbinger Business Unit"];
+    const summaryMap = new Map();
+
+    for (const row of flatRows) {
+        const group = (row[GROUP_IDX] || "")
+            .split(",")
+            .map((g) => g.trim())
+            .filter(Boolean)
+            .join(", ");
+        const lp = row[LP_IDX];
+        const lpValue = (lp || "")
+            .toString()
+            .trim()
+            .toUpperCase();
+
+        if (
+            !group ||
+            !lpValue ||
+            lpValue === "NA" ||
+            lpValue === "N/A"
+        ) {
+            continue;
+        }
+
+        const progressRaw = (row[PROGRESS_IDX] || "")
+            .toString()
+            .trim();
+
+        const progressUpper = progressRaw.toUpperCase();
+
+        const isValidProgress =
+            progressRaw !== "" &&
+            progressUpper !== "NA" &&
+            progressUpper !== "N/A" &&
+            progressUpper !== "NOT FOUND";
+
+        const progress = isValidProgress ? Number(progressRaw) : null;
+
+        const key = group;
+
+        if (!summaryMap.has(key)) {
+            summaryMap.set(key, {
+                group,
+                // lp,
+                learningPaths: new Set(),
+                initiated: 0,
+                inProgress: 0,
+                completed: 0,
+            });
+        }
+
+        const record = summaryMap.get(key);
+
+        record.learningPaths.add(lp);
+
+        //Initiated depends ONLY on LP assignment
+        record.initiated += 1;
+
+        // Completed / In Progress depend on valid progress
+
+        if (progress !== null) {
+            if (progress === 100) {
+                record.completed += 1;
+            } else if (progress < 100) {
+                record.inProgress += 1;
+            }
+        }
+    }
+
+    const summarySheetData = [
+        [
+            "Groups",
+            "AURA 2.0 Learning Paths assigned",
+            "Initiated",
+            "In progress",
+            "Completed",
+            "Completion %",
+        ],
+    ];
+
+    let totalInitiated = 0;
+    let totalCompleted = 0;
+    let totalInprogress = 0;
+    for (const value of summaryMap.values()) {
+        totalInitiated += value.initiated;
+        totalCompleted += value.completed;
+        totalInprogress += value.inProgress;
+
+        summarySheetData.push([
+            value.group,
+            Array.from(value.learningPaths).join("\n"),
+            // .map((lp, index) => `${index + 1}. ${lp}`)
+            // .join("\n"),
+            value.initiated,
+            value.inProgress,
+            value.completed,
+            '',
+        ]);
+    }
+
+    const overallCompletion =
+        totalInitiated > 0
+            ? Number(((totalCompleted / totalInitiated) * 100).toFixed(2))
+            : 0;
+
+    summarySheetData.push([]);
+
+    summarySheetData.push([
+        "OVERALL",
+        "",
+        totalInitiated,
+        totalInprogress,
+        totalCompleted,
+        overallCompletion,
+    ]);
+
+    // ======================================================
+    // CORE / DPU SHEETS
+    // ======================================================
+
+    const CORE_DPU_HEADERS = [
+        "Harbinger Business Unit",
+        "Employee ID",
+        "Employee Name",
+        "Designation Group",
+        "Designation",
+        "Email",
+        "LP given",
+        "Date of Initiation",
+        "Target Due Date",
+        "Groups",
+        "Remarks",
+        "Current Progress",
+    ];
+
+    // Find header rows dynamically
+    const allHeaderRows = allUsersSheetData.filter(
+        (row) =>
+            Array.isArray(row) &&
+            row.length &&
+            row[0] === "Harbinger Business Unit"
+    );
+
+    // Create normalized rows
+    const normalizedRows = [];
+
+    let currentColumnMap = {};
+
+    for (const row of allUsersSheetData) {
+
+        if (
+            Array.isArray(row) &&
+            row.length &&
+            row[0] === "Harbinger Business Unit"
+        ) {
+
+            currentColumnMap = {};
+
+            row.forEach((header, index) => {
+                currentColumnMap[header] = index;
+            });
+
+            continue;
+        }
+
+        if (!Array.isArray(row) || row.length === 0) {
+            continue;
+        }
+
+        const progressIndex =
+            currentColumnMap["Current Progress"] ??
+            currentColumnMap[
+            "Average of Learning Path Progress"
+            ];
+
+        normalizedRows.push({
+            bu:
+                row[
+                currentColumnMap[
+                "Harbinger Business Unit"
+                ]
+                ],
+
+            values: [
+                row[currentColumnMap["Harbinger Business Unit"]],
+                row[currentColumnMap["Employee ID"]],
+                row[currentColumnMap["Employee Name"]],
+                row[currentColumnMap["Designation Group"]],
+                row[currentColumnMap["Designation"]],
+                row[currentColumnMap["Email"]],
+                row[currentColumnMap["LP given"]],
+                row[currentColumnMap["Date of Initiation"]],
+                row[currentColumnMap["Target Due Date"]],
+                row[currentColumnMap["Groups"]],
+                row[currentColumnMap["Remarks"]],
+                row[progressIndex],
+            ],
+        });
+    }
+
+    const coreRows = normalizedRows
+        .filter((r) => r.bu === "Core")
+        .map((r) => r.values);
+
+    const dpuRows = normalizedRows
+        .filter(
+            (r) =>
+                r.bu === "Digital Publishing(DP)"
+        )
+        .map((r) => r.values);
+
+    // ======================================================
+    // WRITE FILE
+    // ======================================================
+
+    const outputPath = path.join(
+        process.cwd(),
+        "generated",
+        `Aura_Report_${Date.now()}.xlsx`
+    );
+
+    const workbook = XLSX.utils.book_new();
+
+    writeAOASheet(
+        workbook,
+        "All Users VS LP Progress",
+        allUsersSheetData
+    );
+
+    writeAOASheet(
+        workbook,
+        "Summary",
+        summarySheetData
+    );
+
+    const coreSheet =
+        XLSX.utils.aoa_to_sheet([
+            CORE_DPU_HEADERS,
+            ...coreRows,
+        ]);
+
+    applyStyles(coreSheet);
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        coreSheet,
+        "CORE"
+    );
+
+    const dpuSheet =
+        XLSX.utils.aoa_to_sheet([
+            CORE_DPU_HEADERS,
+            ...dpuRows,
+        ]);
+
+    applyStyles(dpuSheet);
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        dpuSheet,
+        "DPU"
+    );
+
+    XLSX.writeFile(workbook, outputPath);
+    console.log("STEP 8 - Excel written:", outputPath);
+    return outputPath;
+}
+
+module.exports = {
+    generateReport,
+};
