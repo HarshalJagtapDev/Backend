@@ -17,5 +17,7 @@ router.post(
   upload.single("file"),
   uploadReport
 );
-
+router.get('/health',(req,res)=>{
+  res.send('working')
+})
 module.exports = router;

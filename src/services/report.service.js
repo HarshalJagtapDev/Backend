@@ -34,6 +34,7 @@ async function generateReport(inputFilePath) {
     console.log("STEP 4 - Udemy records received:", udemyRecords.length);
 
     const lookup = new Map();
+    const minutesLookup = new Map();
 
     console.log("STEP 5 - Building lookup");
 
@@ -49,6 +50,7 @@ async function generateReport(inputFilePath) {
         }
         const key = buildKey(record.user_email, record.path_title);
         lookup.set(key, record.completion_ratio || 0);
+        minutesLookup.set(key, record.path_consumed_minutes ?? 0);
     }
 
     const sections = [];
@@ -70,8 +72,16 @@ async function generateReport(inputFilePath) {
     const allUsersSheetData = [];
 
     for (const section of sections) {
+        const lpColumns = [];
         const sampleLP = section[0]["LP given"];
         const learningPaths = extractLearningPaths(sampleLP);
+        for (const lp of learningPaths) {
+            lpColumns.push(lp);
+
+            lpColumns.push(
+                `Path Consumed Minutes (${lp})`
+            );
+        }
         const isMultiLP = learningPaths.length > 1;
         if (isMultiLP) {
             const headers = [
@@ -87,7 +97,8 @@ async function generateReport(inputFilePath) {
                 "Groups",
                 "Remarks",
                 "Average of Learning Path Progress",
-                ...learningPaths,
+                "Total Path Consumed Minutes",
+                ...lpColumns,
             ];
 
             allUsersSheetData.push(headers);
@@ -117,25 +128,32 @@ async function generateReport(inputFilePath) {
                         emp["Target Due Date"],
                         emp["Groups"],
                         emp["Remarks"],
-                        "NA",
-                        ...learningPaths.map(() => "NA"),
+                        "NA", // Average Progress
+                        "NA", // Total path consume minutes
+                        ...learningPaths.flatMap(() => ["NA", "NA"]),
                     ]);
 
                     continue;
                 }
 
                 let total = 0;
+                let totalPathConsumedMinutes = 0;
+                const lpValues = [];
                 const progresses = [];
 
                 for (const lp of learningPaths) {
-                    const key = buildKey(emp.Email, lp);
+                    const key = buildKey(emp.Email,lp);
 
-                    const progress = Number(
-                        lookup.get(key) || 0
-                    );
+                    const progress = Number(lookup.get(key) ?? 0);
+
+                    const minutes = minutesLookup.get(key) ?? 0;
 
                     total += progress;
+                    totalPathConsumedMinutes += minutes;
                     progresses.push(progress);
+
+                    lpValues.push(progress);
+                    lpValues.push(minutes);
                 }
 
                 const average =
@@ -161,7 +179,8 @@ async function generateReport(inputFilePath) {
                     emp["Groups"],
                     emp["Remarks"],
                     average,
-                    ...progresses,
+                    totalPathConsumedMinutes,
+                    ...lpValues,
                 ]);
             }
 
@@ -182,6 +201,7 @@ async function generateReport(inputFilePath) {
             "Groups",
             "Remarks",
             "Current Progress",
+            "Path Consumed Minutes"
         ];
 
         allUsersSheetData.push(headers);
@@ -190,6 +210,7 @@ async function generateReport(inputFilePath) {
             const learningPath = (emp["LP given"] || "").toString().trim();
 
             let progress;
+            let pathConsumedMinutes = "NA";
 
             if (!learningPath || learningPath.toUpperCase() === "NA") {
                 progress = "NA";
@@ -260,8 +281,10 @@ async function generateReport(inputFilePath) {
                     console.log("================================");
 
                     progress = "Not Found";
+                    pathConsumedMinutes = "Not Found";
                 } else {
                     progress = lookup.get(key);
+                    pathConsumedMinutes = minutesLookup.get(key) ?? 0;
                 }
             }
 
@@ -278,42 +301,61 @@ async function generateReport(inputFilePath) {
                 emp["Groups"],
                 emp["Remarks"],
                 progress,
+                pathConsumedMinutes
             ]);
         }
 
         allUsersSheetData.push([]);
     }
 
-    // ======================================================
-    // CLEAN DATA FOR SUMMARY
-    // ======================================================
+// ======================================================
+// CLEAN DATA FOR SUMMARY
+// ======================================================
 
-    const flatRows = allUsersSheetData.filter(
-        (row) => Array.isArray(row) && row.length > 0 && row[0] !== "Harbinger Business Unit"
-    );
-
-    const headerRow = allUsersSheetData.find(
-        (row) =>
-            Array.isArray(row) &&
-            row.includes("Harbinger Business Unit")
-    );
-
-    const columnMap = {};
-
-    headerRow.forEach((header, index) => {
-        columnMap[header] = index;
-    });
-
-    const GROUP_IDX = columnMap["Groups"];
-    const LP_IDX = columnMap["LP given"];
-    const PROGRESS_IDX =
-        columnMap["Current Progress"] ??
-        columnMap["Average of Learning Path Progress"];
-
-    const BU_IDX = columnMap["Harbinger Business Unit"];
     const summaryMap = new Map();
 
-    for (const row of flatRows) {
+    let currentColumnMapForSummary = {};
+
+    for (const row of allUsersSheetData) {
+
+        // Detect section header
+        if (
+            Array.isArray(row) &&
+            row.length &&
+            row[0] === "Harbinger Business Unit"
+        ) {
+
+            currentColumnMapForSummary = {};
+
+            row.forEach((header, index) => {
+                currentColumnMapForSummary[header] = index;
+            });
+
+            continue;
+        }
+
+        if (!Array.isArray(row) || row.length === 0) {
+            continue;
+        }
+
+        const GROUP_IDX =
+            currentColumnMapForSummary["Groups"];
+
+        const LP_IDX =
+            currentColumnMapForSummary["LP given"];
+
+        const PROGRESS_IDX =
+            currentColumnMapForSummary["Current Progress"] ??
+            currentColumnMapForSummary[
+            "Average of Learning Path Progress"
+            ];
+
+        const PATH_MINUTES_IDX =
+            currentColumnMapForSummary["Path Consumed Minutes"];
+
+        const TOTAL_PATH_MINUTES_IDX =
+            currentColumnMapForSummary["Total Path Consumed Minutes"];
+
         const group = (row[GROUP_IDX] || "")
             .split(",")
             .map((g) => g.trim())
@@ -334,11 +376,13 @@ async function generateReport(inputFilePath) {
             continue;
         }
 
-        const progressRaw = (row[PROGRESS_IDX] || "")
-            .toString()
-            .trim();
+        // const progressRaw = (row[PROGRESS_IDX] || "")
+        //     .toString()
+        //     .trim();
+        const progressRaw = String(row[PROGRESS_IDX] ?? "").trim();
 
-        const progressUpper = progressRaw.toUpperCase();
+        const progressUpper =
+            progressRaw.toUpperCase();
 
         const isValidProgress =
             progressRaw !== "" &&
@@ -346,14 +390,39 @@ async function generateReport(inputFilePath) {
             progressUpper !== "N/A" &&
             progressUpper !== "NOT FOUND";
 
-        const progress = isValidProgress ? Number(progressRaw) : null;
+        const progress =
+            isValidProgress
+                ? Number(progressRaw)
+                : null;
 
+        let pathConsumedMinutes = 0;
+
+        if (
+            TOTAL_PATH_MINUTES_IDX !== undefined
+        ) {
+            pathConsumedMinutes = Number(
+                row[TOTAL_PATH_MINUTES_IDX] ?? 0
+            );
+        } else if (
+            PATH_MINUTES_IDX !== undefined
+        ) {
+            pathConsumedMinutes = Number(
+                row[PATH_MINUTES_IDX] ?? 0
+            );
+        }
+//         console.log(
+//             "SUMMARY CHECK",
+//             {
+//                 progressRaw,
+//                 progress,
+//                 pathConsumedMinutes
+//             }
+// );
         const key = group;
 
         if (!summaryMap.has(key)) {
             summaryMap.set(key, {
                 group,
-                // lp,
                 learningPaths: new Set(),
                 initiated: 0,
                 inProgress: 0,
@@ -365,20 +434,32 @@ async function generateReport(inputFilePath) {
 
         record.learningPaths.add(lp);
 
-        //Initiated depends ONLY on LP assignment
+        // Initiated
         record.initiated += 1;
-
-        // Completed / In Progress depend on valid progress
-
+        console.log("Progress data ", {group, progress, pathConsumedMinutes});
         if (progress !== null) {
+
+            // Completed
             if (progress === 100) {
                 record.completed += 1;
-            } else if (progress < 100) {
+            }
+
+            // In Progress
+            else if (
+                progress > 0 &&
+                progress < 100
+            ) {
+                record.inProgress += 1;
+            }
+
+            else if (
+                progress === 0 &&
+                pathConsumedMinutes > 0
+            ) {
                 record.inProgress += 1;
             }
         }
     }
-
     const summarySheetData = [
         [
             "Groups",
