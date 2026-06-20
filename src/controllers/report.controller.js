@@ -1,10 +1,15 @@
-const { generateReport } = require("../services/report.service");
+// const { generateReport } = require("../services/report.service");
+const {
+    getReportGenerator
+} = require("../reports/factory/reportFactory");
 const path = require("path");
 
 async function uploadReport(req, res) {
   console.log("API HIT");
   try {
-    const outputFile = await generateReport(req.file.path);
+    const reportType = req.body.reportType;
+    const generator = getReportGenerator(reportType);
+    const outputFile = await generator.generateReport(req.file.path);
 
     console.log("Report Generated", outputFile);
 

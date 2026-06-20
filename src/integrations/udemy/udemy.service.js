@@ -5,7 +5,7 @@ const {
   clientId,
   clientSecret,
   subdomain,
-} = require("../config/udemy.config");
+} = require("../../config/udemy.config");
 
 
 
@@ -24,9 +24,9 @@ async function getAllUserPathActivities() {
         `${organizationId}/analytics/user-path-activity/`;
 
       const response = await axios.get(url, {
-        // httpsAgent: new https.Agent({
-        //     rejectUnauthorized: false,
-        // }),
+        httpsAgent: new https.Agent({
+            rejectUnauthorized: false,
+        }),
         auth: {
           username: clientId,
           password: clientSecret,
