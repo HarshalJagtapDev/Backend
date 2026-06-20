@@ -1,12 +1,12 @@
 const path = require("path");
 
-const { buildKey, normalizePath } = require("../utils/normalize.util");
+const { buildKey, normalizePath } = require("../../utils/normalize.util");
 
-const { readExcel, writeAOASheet, applyStyles } = require("./excel.service");
+const { readExcel, writeAOASheet, applyStyles } = require("../../services/excel.service");
 
-const { getAllUserPathActivities } = require("./udemy.service");
+const { getAllUserPathActivities } = require("../../integrations/udemy/udemy.service");
 
-const { extractLearningPaths } = require("../utils/learningPath.util");
+const { extractLearningPaths } = require("../../utils/learningPath.util");
 
 // const XLSX = require("xlsx");
 const XLSX = require("xlsx-js-style");
@@ -142,7 +142,7 @@ async function generateReport(inputFilePath) {
                 const progresses = [];
 
                 for (const lp of learningPaths) {
-                    const key = buildKey(emp.Email,lp);
+                    const key = buildKey(emp.Email, lp);
 
                     const progress = Number(lookup.get(key) ?? 0);
 
@@ -308,9 +308,9 @@ async function generateReport(inputFilePath) {
         allUsersSheetData.push([]);
     }
 
-// ======================================================
-// CLEAN DATA FOR SUMMARY
-// ======================================================
+    // ======================================================
+    // CLEAN DATA FOR SUMMARY
+    // ======================================================
 
     const summaryMap = new Map();
 
@@ -410,14 +410,14 @@ async function generateReport(inputFilePath) {
                 row[PATH_MINUTES_IDX] ?? 0
             );
         }
-//         console.log(
-//             "SUMMARY CHECK",
-//             {
-//                 progressRaw,
-//                 progress,
-//                 pathConsumedMinutes
-//             }
-// );
+        //         console.log(
+        //             "SUMMARY CHECK",
+        //             {
+        //                 progressRaw,
+        //                 progress,
+        //                 pathConsumedMinutes
+        //             }
+        // );
         const key = group;
 
         if (!summaryMap.has(key)) {
@@ -436,7 +436,7 @@ async function generateReport(inputFilePath) {
 
         // Initiated
         record.initiated += 1;
-        console.log("Progress data ", {group, progress, pathConsumedMinutes});
+        //console.log("Progress data ", { group, progress, pathConsumedMinutes });
         if (progress !== null) {
 
             // Completed
@@ -606,10 +606,11 @@ async function generateReport(inputFilePath) {
     // WRITE FILE
     // ======================================================
 
+    const dateStr = new Date().toISOString().split('T')[0];
     const outputPath = path.join(
         process.cwd(),
         "generated",
-        `Aura_Report_${Date.now()}.xlsx`
+        `Aura_Report_${dateStr}.xlsx`
     );
 
     const workbook = XLSX.utils.book_new();
