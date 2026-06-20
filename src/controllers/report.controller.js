@@ -28,6 +28,14 @@ async function uploadReport(req, res) {
   } catch (error) {
     console.log("ERROR", error);
 
+    if (error.isValidationError) {
+      return res.status(400).json({
+        success: false,
+        message: "File validation failed",
+        errors: error.validationErrors
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: error.message,

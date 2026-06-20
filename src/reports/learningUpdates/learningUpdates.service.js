@@ -25,6 +25,12 @@ const {
     getAcademyData
 } = require("../../integrations/academy/academy.service");
 
+const { validateData } = require("../../utils/validation.util");
+
+const LEARNING_UPDATES_MANDATORY_COLUMNS = [
+    "Employee Name", "Email ID", "DGF Request ID"
+];
+
 async function generateReport(
     inputFilePath
 ) {
@@ -36,11 +42,7 @@ async function generateReport(
     const employees =
         readExcel(inputFilePath);
 
-    if (!employees.length) {
-        throw new Error(
-            "Input file is empty"
-        );
-    }
+    validateData(employees, LEARNING_UPDATES_MANDATORY_COLUMNS);
 
     console.log(
         "Employees Loaded:",

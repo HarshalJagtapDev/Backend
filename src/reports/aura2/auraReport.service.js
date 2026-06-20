@@ -8,8 +8,14 @@ const { getAllUserPathActivities } = require("../../integrations/udemy/udemy.ser
 
 const { extractLearningPaths } = require("../../utils/learningPath.util");
 
-// const XLSX = require("xlsx");
+const { validateData } = require("../../utils/validation.util");
 const XLSX = require("xlsx-js-style");
+
+const AURA_MANDATORY_COLUMNS = [
+    "Harbinger Business Unit", "Employee ID", "Employee Name", "Designation Group", 
+    "Designation", "Email", "LP given", "Date of Initiation", "Target Due Date", "Groups", "Remarks"
+];
+
 async function generateReport(inputFilePath) {
     console.log("STEP 1 - Reading file");
 
@@ -25,9 +31,7 @@ async function generateReport(inputFilePath) {
 
     console.log("STEP 2 - Employees loaded:", employees.length);
 
-    if (!employees.length) {
-        throw new Error("Input file is empty");
-    }
+    validateData(employees, AURA_MANDATORY_COLUMNS);
 
     const udemyRecords = await getAllUserPathActivities();
 
