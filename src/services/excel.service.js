@@ -296,9 +296,17 @@ function readExcel(filePath) {
 
   const sheet = workbook.Sheets[sheetName];
 
-  return XLSX.utils.sheet_to_json(sheet, {
+  const data = XLSX.utils.sheet_to_json(sheet, {
     defval: "",
     raw: false,
+  });
+
+  return data.filter(row => {
+    return Object.values(row).some(val => {
+      if (val === undefined || val === null) return false;
+      if (typeof val === 'string' && val.trim() === '') return false;
+      return true;
+    });
   });
 }
 
