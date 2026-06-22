@@ -11,10 +11,10 @@ const { extractLearningPaths } = require("../../utils/learningPath.util");
 const { validateData } = require("../../utils/validation.util");
 const XLSX = require("xlsx-js-style");
 
-const AURA_MANDATORY_COLUMNS = [
-    "Harbinger Business Unit", "Employee ID", "Employee Name", "Designation Group", 
-    "Designation", "Email", "LP given", "Date of Initiation", "Target Due Date", "Groups", "Remarks"
-];
+// const AURA_MANDATORY_COLUMNS = [
+//     "Harbinger Business Unit", "Employee ID", "Employee Name", "Designation Group",
+//     "Designation", "Email", "LP given", "Date of Initiation", "Target Due Date", "Groups", "Remarks"
+// ];
 
 async function generateReport(inputFilePath) {
     console.log("STEP 1 - Reading file");
@@ -31,7 +31,7 @@ async function generateReport(inputFilePath) {
 
     console.log("STEP 2 - Employees loaded:", employees.length);
 
-    validateData(employees, AURA_MANDATORY_COLUMNS);
+    // validateData(employees, AURA_MANDATORY_COLUMNS);
 
     const udemyRecords = await getAllUserPathActivities();
 
@@ -43,15 +43,6 @@ async function generateReport(inputFilePath) {
     console.log("STEP 5 - Building lookup");
 
     for (const record of udemyRecords) {
-        if (
-            record.user_email === "diptim@harbingergroup.com" &&
-            record.path_title === "AURA Foundation 2.0 - GenAI Evaluation & Quality Measurement"
-        ) {
-            console.log(
-                "API COMPLETION RATIO:",
-                record.completion_ratio
-            );
-        }
         const key = buildKey(record.user_email, record.path_title);
         lookup.set(key, record.completion_ratio || 0);
         minutesLookup.set(key, record.path_consumed_minutes ?? 0);
@@ -431,6 +422,7 @@ async function generateReport(inputFilePath) {
                 initiated: 0,
                 inProgress: 0,
                 completed: 0,
+                notCompleted: 0,
             });
         }
 
@@ -456,11 +448,20 @@ async function generateReport(inputFilePath) {
                 record.inProgress += 1;
             }
 
+            // Started but still 0%
             else if (
                 progress === 0 &&
                 pathConsumedMinutes > 0
             ) {
                 record.inProgress += 1;
+            }
+
+            // Never started
+            else if (
+                progress === 0 &&
+                pathConsumedMinutes === 0
+            ) {
+                record.notCompleted += 1;
             }
         }
     }
@@ -471,6 +472,7 @@ async function generateReport(inputFilePath) {
             "Initiated",
             "In progress",
             "Completed",
+            "Not Completed",
             "Completion %",
         ],
     ];
@@ -478,19 +480,20 @@ async function generateReport(inputFilePath) {
     let totalInitiated = 0;
     let totalCompleted = 0;
     let totalInprogress = 0;
+    let totalNotCompleted = 0;
     for (const value of summaryMap.values()) {
         totalInitiated += value.initiated;
         totalCompleted += value.completed;
         totalInprogress += value.inProgress;
+        totalNotCompleted += value.notCompleted;
 
         summarySheetData.push([
             value.group,
             Array.from(value.learningPaths).join("\n"),
-            // .map((lp, index) => `${index + 1}. ${lp}`)
-            // .join("\n"),
             value.initiated,
             value.inProgress,
             value.completed,
+            value.notCompleted,
             '',
         ]);
     }
@@ -508,6 +511,7 @@ async function generateReport(inputFilePath) {
         totalInitiated,
         totalInprogress,
         totalCompleted,
+        totalNotCompleted,
         overallCompletion,
     ]);
 
