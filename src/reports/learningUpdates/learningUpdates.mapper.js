@@ -180,8 +180,8 @@ const COLUMN_MAP = {
     },
 
     requestApprovedBySpocDate: {
-        header: "Request approved by SPOC date",
-        value: ({ sf }) => formatExcelDate(sf["Request Approved By SPOC Date"])
+        header: "Request Approved Date",
+        value: ({ sf }) => formatExcelDate(sf["Request Approved By Date"])
     }
 };
 

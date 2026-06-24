@@ -197,7 +197,7 @@ async function getLearningUpdateColumns(req, res) {
       },
       {
         id: "requestApprovedBySpocDate",
-        label: "Request approved by SPOC date"
+        label: "Request Approved Date"
       }
     ];
     return res.status(200).json(columns);
