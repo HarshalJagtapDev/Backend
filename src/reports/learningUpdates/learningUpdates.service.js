@@ -28,11 +28,11 @@ const {
 const { validateData } = require("../../utils/validation.util");
 
 const LEARNING_UPDATES_MANDATORY_COLUMNS = [
-    "Employee Name", "Email ID", "DGF Request ID"
+    "Employee Name", "Email ID", "Learning Request Number"
 ];
 
 async function generateReport(
-    inputFilePath
+    inputFilePath, selectedColumns
 ) {
 
     console.log(
@@ -87,7 +87,8 @@ async function generateReport(
     const outputRows = generateOutputRows({
         skillForgeRecords: skillForgeLookup,
         academyLookup: academyData,
-        employeeRecords: employees
+        employeeRecords: employees,
+        selectedColumns
     });
 
     /**

@@ -22,35 +22,29 @@ const {
  */
 
 function buildCourseContentsMap(courseContents = []) {
-
     const map = {};
-
+    const MOODLE_BASE_URL =process.env.ACADEMY_URL;
     for (const course of courseContents) {
-
         const modules = [];
-
         for (const section of (course.data || [])) {
-
             for (const module of (section.modules || [])) {
-
+                // Skip hidden modules
+                if (module.visible === 0 || module.visible === false) {
+                    continue;
+                }
                 modules.push({
-
                     section: section.name,
-
                     title: module.name,
-
                     type: module.modname
-
                 });
-
             }
-
         }
-        // console.log("buildCourseContentsMap modules", modules)
-        map[course.courseId] = modules;
-        // console.log("buildCourseContentsMap map", map)
+        map[course.courseId] = {
+            courseUrl:
+                `${MOODLE_BASE_URL}/course/view.php?id=${course.courseId}`,
+            modules
+        };
     }
-
     return map;
 }
 
@@ -69,7 +63,6 @@ function buildCourseContentsMap(courseContents = []) {
  */
 
 function buildCourseUserMap(courseUsers = []) {
-
     const map = {};
 
     for (const course of courseUsers) {

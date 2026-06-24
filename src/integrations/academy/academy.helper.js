@@ -54,10 +54,23 @@ function getAssignmentStatus(gradeItem) {
  */
 
 function getValidGradeItems(gradeItems = []) {
+    return gradeItems.filter(item => {
 
-    return gradeItems.filter(item =>
-        item.itemtype === "mod"
-    );
+        // Only module grade items
+        if (item.itemtype !== "mod") {
+            return false;
+        }
+
+        // Skip Udemy integration assignments
+        if (
+            item.itemname &&
+            item.itemname.trim().startsWith("Udemy Course:")
+        ) {
+            return false;
+        }
+
+        return true;
+    });
 
 }
 

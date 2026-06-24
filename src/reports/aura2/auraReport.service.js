@@ -11,6 +11,8 @@ const { extractLearningPaths } = require("../../utils/learningPath.util");
 const { validateData } = require("../../utils/validation.util");
 const XLSX = require("xlsx-js-style");
 
+const { formatExcelDate } = require("../../utils/dateFormat.util")
+
 // const AURA_MANDATORY_COLUMNS = [
 //     "Harbinger Business Unit", "Employee ID", "Employee Name", "Designation Group",
 //     "Designation", "Email", "LP given", "Date of Initiation", "Target Due Date", "Groups", "Remarks"
@@ -119,8 +121,8 @@ async function generateReport(inputFilePath) {
                         emp["Designation"],
                         emp["Email"],
                         emp["LP given"],
-                        emp["Date of Initiation"],
-                        emp["Target Due Date"],
+                        formatExcelDate(emp["Date of Initiation"]),
+                        formatExcelDate(emp["Target Due Date"]),
                         emp["Groups"],
                         emp["Remarks"],
                         "NA", // Average Progress
@@ -169,8 +171,8 @@ async function generateReport(inputFilePath) {
                     emp["Designation"],
                     emp["Email"],
                     emp["LP given"],
-                    emp["Date of Initiation"],
-                    emp["Target Due Date"],
+                    formatExcelDate(emp["Date of Initiation"]),
+                    formatExcelDate(emp["Target Due Date"]),
                     emp["Groups"],
                     emp["Remarks"],
                     average,
@@ -291,8 +293,8 @@ async function generateReport(inputFilePath) {
                 emp["Designation"],
                 emp["Email"],
                 emp["LP given"],
-                emp["Date of Initiation"],
-                emp["Target Due Date"],
+                formatExcelDate(emp["Date of Initiation"]),
+                formatExcelDate(emp["Target Due Date"]),
                 emp["Groups"],
                 emp["Remarks"],
                 progress,

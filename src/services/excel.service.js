@@ -234,8 +234,14 @@ function applyStyles(ws) {
           c: C,
         });
 
-      if (!ws[cellRef]) continue;
+     // if (!ws[cellRef]) continue;
 
+      if (!ws[cellRef]) {
+        ws[cellRef] = {
+          t: "s",
+          v: ""
+        };
+}
       if (isSummaryHeader) {
         ws[cellRef].s =
           summaryHeaderStyle;
@@ -251,6 +257,13 @@ function applyStyles(ws) {
       } else {
         ws[cellRef].s =
           cellStyle;
+      }
+
+      const cell = ws[cellRef];
+
+      if (cell && cell.v instanceof Date) {
+        cell.t = "d";
+        cell.z = "dd-mmm-yy";
       }
     }
   }
@@ -277,8 +290,10 @@ function writeAOASheet(
   sheetName,
   data
 ) {
-  const worksheet =
-    XLSX.utils.aoa_to_sheet(data);
+  const worksheet = XLSX.utils.aoa_to_sheet(data, {
+    cellDates: true,
+    dateNF: "dd-mmm-yy"
+});
 
   applyStyles(worksheet);
 
