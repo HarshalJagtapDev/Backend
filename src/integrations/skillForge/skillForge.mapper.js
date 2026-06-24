@@ -3,9 +3,8 @@ function buildSkillForgeLookup(records) {
     const lookup = new Map();
 
     for (const row of records) {
-
-        const key =
-            `${row["Employee Email"]}|${row["Request Number"]}`;
+        const email = (row["Employee Email"] || "").trim().toLowerCase();
+        const key = `${email}|${row["Request Number"]}`;
 
         if (!lookup.has(key)) {
             lookup.set(key, []);

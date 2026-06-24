@@ -18,7 +18,7 @@ const COLUMN_MAP = {
 
     employeeEmail: {
         header: "Employee Email",
-        value: ({ sf }) => sf["Employee Email"]
+        value: ({ employee }) => employee?.["Email ID"]
     },
 
     bu: {
@@ -198,15 +198,17 @@ function generateOutputRows({ skillForgeRecords, academyLookup, employeeRecords,
     // console.log("academyLookup", JSON.stringify(academyLookup, null, 4))
     const employeeLookup = new Map();
     for (const emp of employeeRecords) {
-        const key = `${emp["Email ID"]}|${emp["Learning Request Number"]}`;
-        // console.log("Employee Key", key);
+        const email = (emp["Email ID"] || "").trim().toLowerCase();
+
+        const key = `${email}|${emp["Learning Request Number"]}`;
+        //console.log("Employee Key", key);
         employeeLookup.set(key, emp);
-        // console.log("Employee employeeLookup", employeeLookup);
+        //console.log("Employee employeeLookup", employeeLookup);
 
     }
     for (const [key, sfArray] of skillForgeRecords) {
         const employee = employeeLookup.get(key);
-        // console.log("employee", employee);
+        //console.log("employee", employee);
 
         for (const sf of sfArray) {
             const courseId = sf["Course ID"];
