@@ -2,7 +2,7 @@ const path = require("path");
 
 const { buildKey, normalizePath } = require("../../utils/normalize.util");
 
-const { readExcel, writeAOASheet, applyStyles } = require("../../services/excel.service");
+const { readExcel, writeAOASheet } = require("../../services/excel.service");
 
 const { getAllUserPathActivities } = require("../../integrations/udemy/udemy.service");
 
@@ -571,10 +571,9 @@ async function generateReport(inputFilePath) {
         }
 
         const progressIndex =
-            currentColumnMap["Current Progress"] ??
             currentColumnMap[
             "Average of Learning Path Progress"
-            ];
+            ] ?? currentColumnMap["Current Progress"];
 
         normalizedRows.push({
             bu:
@@ -637,33 +636,15 @@ async function generateReport(inputFilePath) {
         summarySheetData
     );
 
-    const coreSheet =
-        XLSX.utils.aoa_to_sheet([
-            CORE_DPU_HEADERS,
-            ...coreRows,
-        ]);
+    writeAOASheet(workbook, "CORE", [
+        CORE_DPU_HEADERS,
+        ...coreRows,
+    ]);
 
-    applyStyles(coreSheet);
-
-    XLSX.utils.book_append_sheet(
-        workbook,
-        coreSheet,
-        "CORE"
-    );
-
-    const dpuSheet =
-        XLSX.utils.aoa_to_sheet([
-            CORE_DPU_HEADERS,
-            ...dpuRows,
-        ]);
-
-    applyStyles(dpuSheet);
-
-    XLSX.utils.book_append_sheet(
-        workbook,
-        dpuSheet,
-        "DPU"
-    );
+    writeAOASheet(workbook, "DPU", [
+        CORE_DPU_HEADERS,
+        ...dpuRows,
+    ]);
 
     XLSX.writeFile(workbook, outputPath);
     console.log("STEP 8 - Excel written:", outputPath);

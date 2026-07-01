@@ -1,5 +1,22 @@
 const XLSX = require("xlsx-js-style");
 
+function getRowMaxCol(ws, rowIndex, range) {
+  let maxCol = range.s.c;
+
+  for (let C = range.s.c; C <= range.e.c; C++) {
+    const cellRef = XLSX.utils.encode_cell({
+      r: rowIndex,
+      c: C,
+    });
+
+    if (ws[cellRef]) {
+      maxCol = C;
+    }
+  }
+
+  return maxCol;
+}
+
 function applyStyles(ws) {
   if (!ws["!ref"]) return;
 
@@ -150,6 +167,8 @@ function applyStyles(ws) {
   // Apply styles
   // ---------------------------------------
 
+  let currentSectionMaxCol = range.e.c;
+
   for (let R = range.s.r; R <= range.e.r; R++) {
     let isNoLPRow = false;
     let isCompletedRow = false;
@@ -223,8 +242,14 @@ function applyStyles(ws) {
     const isSummaryHeader =
       firstCellValue === "Groups";
 
+    if (isNormalHeader || isSummaryHeader) {
+      currentSectionMaxCol = getRowMaxCol(ws, R, range);
+    }
+
+    const rowMaxCol = currentSectionMaxCol;
+
     for (
-      let C = range.s.c;
+      let C = rowMaxCol + 1;
       C <= range.e.c;
       C++
     ) {
@@ -234,14 +259,24 @@ function applyStyles(ws) {
           c: C,
         });
 
-     // if (!ws[cellRef]) continue;
+      if (ws[cellRef]) {
+        delete ws[cellRef];
+      }
+    }
 
-      if (!ws[cellRef]) {
-        ws[cellRef] = {
-          t: "s",
-          v: ""
-        };
-}
+    for (
+      let C = range.s.c;
+      C <= rowMaxCol;
+      C++
+    ) {
+      const cellRef =
+        XLSX.utils.encode_cell({
+          r: R,
+          c: C,
+        });
+
+      if (!ws[cellRef]) continue;
+
       if (isSummaryHeader) {
         ws[cellRef].s =
           summaryHeaderStyle;
@@ -283,6 +318,12 @@ function applyStyles(ws) {
       wch: 30,
     });
   }
+
+  ws["!sheetViews"] = [
+    {
+      showGridLines: false,
+    },
+  ];
 }
 
 function writeAOASheet(
